@@ -43,7 +43,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64
 
 #export CUDA_GPU_SM=sm_35 # NVIDIA K20m
 #export CUDA_GPU_SM=sm_37 # NVIDIA K80
-export CUDA_GPU_SM=sm_60 # NVIDIA P100
+#export CUDA_GPU_SM=sm_60 # NVIDIA P100
 #export CUDA_GPU_SM=sm_61 # NVIDIA GTX 1080Ti
 #export CUDA_GPU_SM=sm_75 # NVIDIA RTX 2080Ti
 #export CUDA_GPU_SM=sm_80 # NVIDIA A100
+export CUDA_GPU_SM=sm_86 # NVIDIA RTX A1000
