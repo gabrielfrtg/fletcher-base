@@ -1,0 +1,3 @@
+CC=$(GCC)
+CFLAGS=-O3 -std=c99
+LIBS=$(CL_LIBS) $(GCC_LIBS)

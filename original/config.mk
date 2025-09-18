@@ -12,6 +12,7 @@ GCC_LIBS=-lm
 NVCC_LIBS=-lcudart -lstdc++    # it may include CUDA lib64 path...
 PGCC_LIBS=-lm
 # CLANG_LIBS=-lm
+CL_LIBS=-lOpenCL
 
 # PAPI flags
 PAPI_LIBS=-lpapi
