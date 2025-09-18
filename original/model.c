@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "utils.h"
 #include "source.h"
 #include "driver.h"
@@ -136,7 +138,7 @@ void Model(const int st, const int iSource, const float dtOutput, SlicePtr sPtr,
 #define GIGA 1.0e-9
   const char StringHWM[6]="VmHWM";
   char line[256], title[12],HWMUnit[8];
-  const long HWM;
+  long HWM=0;
   const double MSamples=(MEGA*(double)totalSamples)/walltime;
   
   FILE *fp=fopen("/proc/self/status","r");
