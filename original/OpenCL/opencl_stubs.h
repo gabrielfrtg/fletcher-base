@@ -26,6 +26,11 @@ typedef struct _cl_kernel *cl_kernel;
 typedef struct _cl_event *cl_event;
 typedef struct _cl_sampler *cl_sampler;
 
+typedef struct _cl_buffer_region {
+    size_t origin;
+    size_t size;
+} cl_buffer_region;
+
 #define CL_SUCCESS 0
 #define CL_DEVICE_TYPE_DEFAULT (1ULL << 0)
 #define CL_DEVICE_TYPE_CPU (1ULL << 1)
@@ -36,6 +41,8 @@ typedef struct _cl_sampler *cl_sampler;
 #define CL_MEM_READ_WRITE (1ULL << 0)
 #define CL_MEM_WRITE_ONLY (1ULL << 1)
 #define CL_MEM_READ_ONLY (1ULL << 2)
+
+#define CL_BUFFER_CREATE_TYPE_REGION 0x1220
 
 #define CL_FALSE 0
 #define CL_TRUE 1
@@ -58,6 +65,8 @@ cl_int clGetProgramBuildInfo(cl_program program, cl_device_id device, cl_program
                              size_t param_value_size, void *param_value, size_t *param_value_size_ret);
 cl_kernel clCreateKernel(cl_program program, const char *kernel_name, cl_int *errcode_ret);
 cl_mem clCreateBuffer(cl_context context, cl_mem_flags flags, size_t size, void *host_ptr, cl_int *errcode_ret);
+cl_mem clCreateSubBuffer(cl_mem buffer, cl_mem_flags flags, cl_uint buffer_create_type,
+                         const void *buffer_create_info, cl_int *errcode_ret);
 cl_int clEnqueueWriteBuffer(cl_command_queue command_queue, cl_mem buffer, cl_bool blocking_write,
                             size_t offset, size_t size, const void *ptr, cl_uint num_events_in_wait_list,
                             const cl_event *event_wait_list, cl_event *event);

@@ -39,10 +39,16 @@ typedef struct {
     cl_mem v2pz;
     cl_mem v2sz;
     cl_mem v2pn;
+    cl_mem pp_full;
+    cl_mem pc_full;
+    cl_mem qp_full;
+    cl_mem qc_full;
     cl_mem pp;
     cl_mem pc;
     cl_mem qp;
     cl_mem qc;
+    size_t plane_bytes;
+    size_t wave_bytes;
     size_t global[2];
     size_t local[2];
     int use_local_size;
@@ -62,6 +68,31 @@ static void release_mem(cl_mem *buffer) {
     if (*buffer) {
         clReleaseMemObject(*buffer);
         *buffer = NULL;
+    }
+}
+
+static void create_wave_buffer(cl_mem *base, cl_mem *view, cl_context context, cl_command_queue queue,
+                               size_t total_bytes, size_t offset_bytes, size_t volume_bytes,
+                               const void *zero_data, const float *initial_data) {
+    cl_int err = 0;
+    *base = clCreateBuffer(context, CL_MEM_READ_WRITE, total_bytes, NULL, &err);
+    OPENCL_CHECK(err, "clCreateBuffer wave");
+
+    if (total_bytes > 0 && zero_data) {
+        err = clEnqueueWriteBuffer(queue, *base, CL_TRUE, 0, total_bytes, zero_data, 0, NULL, NULL);
+        OPENCL_CHECK(err, "clEnqueueWriteBuffer wave zero");
+    }
+
+    const cl_buffer_region region = {
+        .origin = offset_bytes,
+        .size = volume_bytes,
+    };
+    *view = clCreateSubBuffer(*base, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+    OPENCL_CHECK(err, "clCreateSubBuffer wave");
+
+    if (initial_data && volume_bytes > 0) {
+        err = clEnqueueWriteBuffer(queue, *view, CL_TRUE, 0, volume_bytes, initial_data, 0, NULL, NULL);
+        OPENCL_CHECK(err, "clEnqueueWriteBuffer wave init");
     }
 }
 
@@ -191,8 +222,13 @@ void OPENCL_Initialize(const int sx, const int sy, const int sz, const int bord,
 
     build_program(&state);
 
-    const size_t volume = (size_t)sx * (size_t)sy * (size_t)sz;
+    const size_t plane = (size_t)sx * (size_t)sy;
+    const size_t volume = plane * (size_t)sz;
     const size_t bytes = volume * sizeof(float);
+    const size_t total_wave_bytes = bytes + 2 * plane * sizeof(float);
+
+    state.plane_bytes = plane * sizeof(float);
+    state.wave_bytes = bytes;
 
     create_and_write_buffer(&state.ch1dxx, state.context, state.queue, CL_MEM_READ_ONLY, bytes, ch1dxx);
     create_and_write_buffer(&state.ch1dyy, state.context, state.queue, CL_MEM_READ_ONLY, bytes, ch1dyy);
@@ -204,10 +240,23 @@ void OPENCL_Initialize(const int sx, const int sy, const int sz, const int bord,
     create_and_write_buffer(&state.v2pz, state.context, state.queue, CL_MEM_READ_ONLY, bytes, v2pz);
     create_and_write_buffer(&state.v2sz, state.context, state.queue, CL_MEM_READ_ONLY, bytes, v2sz);
     create_and_write_buffer(&state.v2pn, state.context, state.queue, CL_MEM_READ_ONLY, bytes, v2pn);
-    create_and_write_buffer(&state.pp, state.context, state.queue, CL_MEM_READ_WRITE, bytes, pp);
-    create_and_write_buffer(&state.pc, state.context, state.queue, CL_MEM_READ_WRITE, bytes, pc);
-    create_and_write_buffer(&state.qp, state.context, state.queue, CL_MEM_READ_WRITE, bytes, qp);
-    create_and_write_buffer(&state.qc, state.context, state.queue, CL_MEM_READ_WRITE, bytes, qc);
+
+    void *zero_wave = calloc(total_wave_bytes, 1);
+    if (!zero_wave) {
+        fprintf(stderr, "Failed to allocate temporary zero buffer for OpenCL wave fields.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    create_wave_buffer(&state.pp_full, &state.pp, state.context, state.queue,
+                       total_wave_bytes, state.plane_bytes, bytes, zero_wave, pp);
+    create_wave_buffer(&state.pc_full, &state.pc, state.context, state.queue,
+                       total_wave_bytes, state.plane_bytes, bytes, zero_wave, pc);
+    create_wave_buffer(&state.qp_full, &state.qp, state.context, state.queue,
+                       total_wave_bytes, state.plane_bytes, bytes, zero_wave, qp);
+    create_wave_buffer(&state.qc_full, &state.qc, state.context, state.queue,
+                       total_wave_bytes, state.plane_bytes, bytes, zero_wave, qc);
+
+    free(zero_wave);
 
     clFinish(state.queue);
 
@@ -233,6 +282,10 @@ void OPENCL_Finalize()
     release_mem(&state.pc);
     release_mem(&state.qp);
     release_mem(&state.qc);
+    release_mem(&state.pp_full);
+    release_mem(&state.pc_full);
+    release_mem(&state.qp_full);
+    release_mem(&state.qc_full);
 
     if (state.kernel_propagate) {
         clReleaseKernel(state.kernel_propagate);
