@@ -45,6 +45,7 @@ typedef struct {
     cl_mem qc;
     size_t global[2];
     size_t local[2];
+    int use_local_size;
 } OpenCLState;
 
 static OpenCLState state = {0};
@@ -173,10 +174,11 @@ void OPENCL_Initialize(const int sx, const int sy, const int sz, const int bord,
     state.dy = dy;
     state.dz = dz;
     state.dt = dt;
-    state.local[0] = 32;
-    state.local[1] = 16;
-    state.global[0] = ((size_t)sx + state.local[0] - 1) / state.local[0] * state.local[0];
-    state.global[1] = ((size_t)sy + state.local[1] - 1) / state.local[1] * state.local[1];
+    state.global[0] = (size_t)sx;
+    state.global[1] = (size_t)sy;
+    state.local[0] = 0;
+    state.local[1] = 0;
+    state.use_local_size = 0;
 
     select_device(&state.device);
 
@@ -307,7 +309,8 @@ void OPENCL_Propagate(const int sx, const int sy, const int sz, const int bord,
     err |= clSetKernelArg(state.kernel_propagate, 22, sizeof(cl_mem), &state.qc);
     OPENCL_CHECK(err, "clSetKernelArg propagate");
 
-    err = clEnqueueNDRangeKernel(state.queue, state.kernel_propagate, 2, NULL, state.global, state.local, 0, NULL, NULL);
+    const size_t *local = state.use_local_size ? state.local : NULL;
+    err = clEnqueueNDRangeKernel(state.queue, state.kernel_propagate, 2, NULL, state.global, local, 0, NULL, NULL);
     OPENCL_CHECK(err, "clEnqueueNDRangeKernel propagate");
 
     clFinish(state.queue);
