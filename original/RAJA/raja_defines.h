@@ -20,11 +20,16 @@ using EXEC_POL = RAJA::cuda_exec<CUDA_BLOCK_SIZE>;
 using REDUCE_POL = RAJA::cuda_reduce;
 
 // Nested policy for 2D kernel execution
+// Use CudaKernelFixed with explicit block size and tiling
 using NESTED_POL = RAJA::KernelPolicy<
-  RAJA::statement::CudaKernel<
-    RAJA::statement::For<1, RAJA::cuda_block_y_loop,
-      RAJA::statement::For<0, RAJA::cuda_thread_x_loop,
-        RAJA::statement::Lambda<0>
+  RAJA::statement::CudaKernelFixed<CUDA_BLOCK_SIZE,
+    RAJA::statement::Tile<1, RAJA::tile_fixed<BSIZE_Y>, RAJA::cuda_block_y_loop,
+      RAJA::statement::Tile<0, RAJA::tile_fixed<BSIZE_X>, RAJA::cuda_block_x_loop,
+        RAJA::statement::For<1, RAJA::cuda_thread_y_direct,
+          RAJA::statement::For<0, RAJA::cuda_thread_x_direct,
+            RAJA::statement::Lambda<0>
+          >
+        >
       >
     >
   >

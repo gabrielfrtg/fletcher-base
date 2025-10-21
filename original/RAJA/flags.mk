@@ -12,25 +12,28 @@ CXXFLAGS=-O3 -std=c++17
 # Adjust these paths based on your RAJA installation
 ifdef RAJA_DIR
   RAJA_INCLUDE=-I$(RAJA_DIR)/include
-  RAJA_LIB=-L$(RAJA_DIR)/lib -lRAJA
+  RAJA_LIB=-L$(RAJA_DIR)/lib -lRAJA -lcamp
 else
   $(warning RAJA_DIR not set. Assuming RAJA is in system path)
   RAJA_INCLUDE=
-  RAJA_LIB=-lRAJA
+  RAJA_LIB=-lRAJA -lcamp
 endif
 
 # Backend selection
-# RAJA auto-detects backend from config.hpp, so we don't define RAJA_ENABLE_*
-# Just set the appropriate compiler and libraries
+# Define RAJA_ENABLE_* macro to match the backend RAJA was built with
 ifdef RAJA_ENABLE_CUDA
   # CUDA backend - use nvcc and link CUDA runtime
-  BACKEND_FLAGS=
+  # Use -x cu to treat .cpp files as CUDA source files
+  # -arch=sm_89 for RTX 4090 (compute capability 8.9)
+  # --allow-unsupported-compiler for newer GCC versions
+  # -Xcompiler -fpermissive to work around GCC 12 C++ standard library issues
+  BACKEND_FLAGS=-DRAJA_ENABLE_CUDA -x cu -arch=sm_89 -allow-unsupported-compiler
   BACKEND_LIBS=-L/usr/local/cuda/lib64 -lcudart
   CXX=$(NVCC)
-  CXXFLAGS=-O3 -std=c++17 --expt-extended-lambda --expt-relaxed-constexpr -Xcompiler -fopenmp
+  CXXFLAGS=-O3 -std=c++17 --expt-extended-lambda --expt-relaxed-constexpr -Xcompiler -fopenmp -Xcompiler -fpermissive
 else ifdef RAJA_ENABLE_HIP
   # HIP backend - use hipcc and link HIP runtime
-  BACKEND_FLAGS=
+  BACKEND_FLAGS=-DRAJA_ENABLE_HIP
   BACKEND_LIBS=-L/opt/rocm/lib -lamdhip64
   CXX=$(HIPCC)
   CXXFLAGS=-O3 -std=c++17
