@@ -36,7 +36,7 @@ else ifdef RAJA_ENABLE_HIP
   BACKEND_FLAGS=-DRAJA_ENABLE_HIP
   BACKEND_LIBS=-L/opt/rocm/lib -lamdhip64
   CXX=$(HIPCC)
-  CXXFLAGS=-O3 -std=c++17
+  CXXFLAGS=-O3 -std=c++17 -fPIE
 else
   # OpenMP CPU backend (default)
   BACKEND_FLAGS=-fopenmp

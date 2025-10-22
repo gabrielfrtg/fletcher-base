@@ -42,11 +42,17 @@ constexpr int HIP_BLOCK_SIZE = BSIZE_X * BSIZE_Y;
 using EXEC_POL = RAJA::hip_exec<HIP_BLOCK_SIZE>;
 using REDUCE_POL = RAJA::hip_reduce;
 
+// Nested policy for 2D kernel execution matching CUDA structure
+// Use HipKernelFixed with explicit block size and tiling
 using NESTED_POL = RAJA::KernelPolicy<
-  RAJA::statement::HipKernel<
-    RAJA::statement::For<1, RAJA::hip_block_y_loop,
-      RAJA::statement::For<0, RAJA::hip_thread_x_loop,
-        RAJA::statement::Lambda<0>
+  RAJA::statement::HipKernelFixed<HIP_BLOCK_SIZE,
+    RAJA::statement::Tile<1, RAJA::tile_fixed<BSIZE_Y>, RAJA::hip_block_y_loop,
+      RAJA::statement::Tile<0, RAJA::tile_fixed<BSIZE_X>, RAJA::hip_block_x_loop,
+        RAJA::statement::For<1, RAJA::hip_thread_y_direct,
+          RAJA::statement::For<0, RAJA::hip_thread_x_direct,
+            RAJA::statement::Lambda<0>
+          >
+        >
       >
     >
   >
