@@ -1,0 +1,28 @@
+#ifndef __KOKKOS_STUFF
+#define __KOKKOS_STUFF
+
+#ifdef __cplusplus
+extern "C" {
+#ifndef restrict
+#define restrict __restrict__
+#endif
+#endif
+
+void KOKKOS_Initialize(const int sx, const int sy, const int sz, const int bord,
+                       float dx, float dy, float dz, float dt,
+                       float * restrict ch1dxx, float * restrict ch1dyy, float * restrict ch1dzz,
+                       float * restrict ch1dxy, float * restrict ch1dyz, float * restrict ch1dxz,
+                       float * restrict v2px, float * restrict v2pz, float * restrict v2sz, float * restrict v2pn,
+                       float * restrict vpz, float * restrict vsv, float * restrict epsilon, float * restrict delta,
+                       float * restrict phi, float * restrict theta,
+                       float * restrict pp, float * restrict pc, float * restrict qp, float * restrict qc);
+
+void KOKKOS_Finalize();
+
+void KOKKOS_Update_pointers(const int sx, const int sy, const int sz, float *pc);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

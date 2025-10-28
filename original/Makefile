@@ -26,9 +26,15 @@ OBJ=main.o $(OBJ1)
 
 TARGET = ModelagemFletcher.exe
 
+# Use CXX for linking if defined (needed for C++ backends like KOKKOS), otherwise use CC
+LINKER ?= $(CC)
+ifneq ($(CXX),)
+LINKER = $(CXX)
+endif
+
 all: 	$(OBJ)
 	cd $(arch) && make
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(arch)/*.o $(LIBS)
+	$(LINKER) $(CFLAGS) -o $(TARGET) $(OBJ) $(arch)/*.o $(LIBS)
 
 main.o:	main.c $(OBJ1)
 	$(CC) -c $(CFLAGS) main.c
