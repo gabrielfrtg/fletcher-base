@@ -34,9 +34,9 @@ ifdef RAJA_ENABLE_CUDA
 else ifdef RAJA_ENABLE_HIP
   # HIP backend - use hipcc and link HIP runtime
   BACKEND_FLAGS=-DRAJA_ENABLE_HIP
-  BACKEND_LIBS=-L/opt/rocm/lib -lamdhip64
+  BACKEND_LIBS=-L/opt/rocm/lib -lamdhip64 -fopenmp
   CXX=$(HIPCC)
-  CXXFLAGS=-O3 -std=c++17 -fPIE
+  CXXFLAGS=-O3 -std=c++17 -fPIE -fopenmp -Wno-unused-result
 else
   # OpenMP CPU backend (default)
   BACKEND_FLAGS=-fopenmp
