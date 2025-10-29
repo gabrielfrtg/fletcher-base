@@ -75,7 +75,15 @@ int main(int argc, char *argv[])
    fclose(f2);
    fclose(f3);
 
-   if (global_cont) return 1;
+   if (global_cont) {
+       free(plane1);
+       free(plane2);
+       free(diff);
+       return 1;
+   }
    printf("success\n");
+   free(plane1);
+   free(plane2);
+   free(diff);
    return 0;
 }
