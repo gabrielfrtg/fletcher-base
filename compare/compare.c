@@ -37,8 +37,11 @@ int main(int argc, char *argv[])
 
    const size_t msize=n1*n2*sizeof(float);
    float *plane1 = malloc(n1*n2*sizeof(float));
+   if (plane1 == NULL) ERRO("malloc failed for plane1");
    float *plane2 = malloc(n1*n2*sizeof(float));
+   if (plane2 == NULL) ERRO("malloc failed for plane2");
    float *diff   = malloc(n1*n2*sizeof(float));
+   if (diff == NULL) ERRO("malloc failed for diff");
    FILE* f1 = fopen(file1, "r");
    if (f1 == NULL) ERRO("fopen");
    FILE* f2 = fopen(file2, "r");
