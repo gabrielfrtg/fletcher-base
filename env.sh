@@ -48,3 +48,12 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64
 #export CUDA_GPU_SM=sm_75 # NVIDIA RTX 2080Ti
 #export CUDA_GPU_SM=sm_80 # NVIDIA A100
 export CUDA_GPU_SM=sm_86 # NVIDIA RTX A1000
+
+
+# hip
+# For HIP/ROCm (e.g., gfx900, gfx906, gfx908, gfx90a, gfx942, gfx1030, gfx1100)
+# RX 7900 XT/XTX uses gfx1100
+export HIP_GPU_ARCH?=gfx1100
+# ROCm installation path
+export ROCM_PATH?=/opt/rocm
+
