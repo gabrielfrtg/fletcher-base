@@ -1,0 +1,116 @@
+Bootstrap: docker
+From: rocm/dev-ubuntu-22.04:6.1.2-complete
+
+%labels
+	Maintainer "Fletcher Base Project"
+	RAJAVersion "2024.07.0"
+	Description "RAJA built with HIP backend for AMD GPUs"
+
+%help
+	This container provides a recent RAJA build with HIP/ROCm support targeting
+	AMD GPUs. Use `singularity run --rocm raja-amd.sif` to enter the
+	environment with ROCm libraries exposed. Adjust the RAJA_VERSION and
+	RAJA_AMD_ARCH build arguments when rebuilding if you need a different
+	release or GPU architecture.
+
+	Common AMD GPU architectures:
+	- RX 7900 XTX: gfx1100 (RDNA 3) [default]
+	- MI210: gfx90a (CDNA 2)
+	- MI300X: gfx942 (CDNA 3)
+
+%post
+	set -ex
+
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		build-essential \
+		ca-certificates \
+		curl \
+		gfortran \
+		git \
+		gnupg \
+		libopenmpi-dev \
+		ninja-build \
+		pkg-config \
+		python3 \
+		python3-pip \
+		python3-setuptools \
+		wget \
+		rocthrust-dev \
+		rocprim-dev \
+		locales
+
+	# Generate and set locale to fix perl warnings
+	locale-gen en_US.UTF-8
+	update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+	rm -rf /var/lib/apt/lists/*
+
+	# Install newer CMake via pip (RAJA requires CMake >= 3.23)
+	pip3 install --no-cache-dir "cmake>=3.23"
+
+	# Build and install RAJA from the latest tagged release.
+	export RAJA_VERSION="${RAJA_VERSION:-2024.07.0}"
+	export RAJA_AMD_ARCH="${RAJA_AMD_ARCH:-gfx1100}"
+	export RAJA_SOURCE_DIR="/tmp/raja-${RAJA_VERSION}"
+	export RAJA_BUILD_DIR="${RAJA_SOURCE_DIR}/build"
+	export RAJA_INSTALL_DIR="/opt/raja/${RAJA_VERSION}"
+
+	# Clean up any previous build attempts
+	rm -rf "${RAJA_SOURCE_DIR}"
+
+	# Clone RAJA with all submodules (BLT, CAMP, etc.)
+	git clone --branch "v${RAJA_VERSION}" --recurse-submodules --shallow-submodules https://github.com/LLNL/RAJA.git "${RAJA_SOURCE_DIR}"
+
+	# Set ROCm environment variables for proper detection
+	export ROCM_PATH="/opt/rocm"
+	export HIP_PATH="/opt/rocm"
+
+	cmake -S "${RAJA_SOURCE_DIR}" -B "${RAJA_BUILD_DIR}" \
+		-G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_C_COMPILER=$(which gcc) \
+		-DCMAKE_CXX_COMPILER=$(which hipcc) \
+		-DCMAKE_CXX_STANDARD=17 \
+		-DCMAKE_INSTALL_PREFIX="${RAJA_INSTALL_DIR}" \
+		-DROCM_PATH="/opt/rocm" \
+		-DHIP_PATH="/opt/rocm" \
+		-DCMAKE_HIP_ARCHITECTURES="${RAJA_AMD_ARCH}" \
+		-DRAJA_ENABLE_HIP=ON \
+		-DRAJA_ENABLE_OPENMP=ON \
+		-DRAJA_ENABLE_EXAMPLES=OFF \
+		-DRAJA_ENABLE_TESTS=OFF \
+		-DRAJA_ENABLE_EXERCISES=OFF \
+		-DRAJA_ENABLE_DOCUMENTATION=OFF \
+		-DENABLE_OPENMP=ON \
+		-DENABLE_HIP=ON
+
+	cmake --build "${RAJA_BUILD_DIR}" --target install
+
+	# Clean build artifacts to keep image slim.
+	rm -rf /tmp/raja-*
+
+	# Provide a default modulefile-like environment hint.
+	cat <<'EOF' >/etc/profile.d/raja.sh
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+export RAJA_VERSION=${RAJA_VERSION:-2024.07.0}
+export RAJA_ROOT=/opt/raja/${RAJA_VERSION}
+export PATH=${RAJA_ROOT}/bin:${PATH}
+export LD_LIBRARY_PATH=${RAJA_ROOT}/lib:${RAJA_ROOT}/lib64:${LD_LIBRARY_PATH}
+export HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES:-0}
+EOF
+
+%environment
+	export LANG=en_US.UTF-8
+	export LC_ALL=en_US.UTF-8
+	export RAJA_VERSION=${RAJA_VERSION:-2024.07.0}
+	export RAJA_ROOT=/opt/raja/${RAJA_VERSION}
+	export PATH=${RAJA_ROOT}/bin:${PATH}
+	export LD_LIBRARY_PATH=${RAJA_ROOT}/lib:${RAJA_ROOT}/lib64:${LD_LIBRARY_PATH}
+
+%runscript
+	echo "RAJA ${RAJA_VERSION} environment ready for AMD GPUs."
+	echo "Remember to execute with 'singularity run --rocm' to expose AMD GPUs."
+	exec "$@"
