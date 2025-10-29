@@ -28,7 +28,7 @@ ifdef RAJA_ENABLE_CUDA
   # --allow-unsupported-compiler for newer GCC versions
   # -Xcompiler -fpermissive to work around GCC 12 C++ standard library issues
   BACKEND_FLAGS=-DRAJA_ENABLE_CUDA -x cu -arch=sm_89 -allow-unsupported-compiler
-  BACKEND_LIBS=-L/usr/local/cuda/lib64 -lcudart
+  BACKEND_LIBS=-L/usr/local/cuda/lib64 -lcudart -fopenmp
   CXX=$(NVCC)
   CXXFLAGS=-O3 -std=c++17 --expt-extended-lambda --expt-relaxed-constexpr -Xcompiler -fopenmp -Xcompiler -fpermissive
 else ifdef RAJA_ENABLE_HIP
