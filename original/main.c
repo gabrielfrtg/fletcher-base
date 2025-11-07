@@ -10,6 +10,10 @@
 #include "fletcher.h"
 #include "model.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 enum Form {ISO, VTI, TTI};
 
 int main(int argc, char** argv) {
@@ -119,7 +123,6 @@ int main(int argc, char** argv) {
   printf("Will run %d time steps of %f to reach time %f\n", st, dt, st*dt);
 
 #ifdef _OPENMP
-#include <omp.h>
 #pragma omp parallel
   if (omp_get_thread_num() == 0) {
     if (omp_get_num_threads()==1)
