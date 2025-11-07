@@ -1,0 +1,36 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+	Maintainer "Fletcher Base Project"
+	GCCVersion "13"
+	Description "GCC with NVPTX offload for OpenMP target"
+
+%post
+	set -ex
+
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		gcc-13 \
+		g++-13 \
+		gcc-13-offload-nvptx \
+		make \
+		locales
+
+	# Set GCC 13 as default
+	update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+	update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+
+	# Generate locale
+	locale-gen en_US.UTF-8
+
+	rm -rf /var/lib/apt/lists/*
+
+%environment
+	export LANG=en_US.UTF-8
+	export LC_ALL=en_US.UTF-8
+
+%runscript
+	echo "GCC 13 with NVPTX offload for OpenMP target"
+	exec "$@"

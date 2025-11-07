@@ -1,0 +1,77 @@
+Bootstrap: docker
+From: nvidia/cuda:12.3.1-devel-ubuntu22.04
+
+%labels
+	Maintainer "Fletcher Base Project"
+	CUDAVersion "12.3.1"
+	Description "OpenMP target offload with GCC for NVIDIA GPUs"
+
+%help
+	This container provides GCC with NVPTX offload support for NVIDIA GPUs.
+	Use `singularity shell --nv openmp-target-nvidia.sif` to enter the environment.
+
+	Common NVIDIA GPU architectures:
+	- RTX 30-series: sm_86
+	- RTX 40-series: sm_89
+	- A100: sm_80
+	- H100: sm_90
+
+	Build Fletcher:
+	  singularity shell --nv openmp-target-nvidia.sif
+	  cd fletcher-base/original
+	  cp ../singularity/flags-container-nvidia.mk OpenMP_Target/flags.mk
+	  make backend=OpenMP_Target
+
+%post
+	set -ex
+
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		build-essential \
+		ca-certificates \
+		software-properties-common \
+		locales
+
+	# Generate and set locale
+	locale-gen en_US.UTF-8
+	update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+	# Install GCC 13 with NVPTX offload support
+	add-apt-repository -y ppa:ubuntu-toolchain-r/test
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		gcc-13 \
+		g++-13 \
+		gcc-13-offload-nvptx
+
+	# Set GCC 13 as default
+	update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+	update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+
+	rm -rf /var/lib/apt/lists/*
+
+	# Provide environment setup
+	cat <<'EOF' >/etc/profile.d/openmp-target.sh
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+export CUDA_HOME=/usr/local/cuda
+export PATH=${CUDA_HOME}/bin:${PATH}
+export LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+export CC=gcc
+export CXX=g++
+EOF
+
+%environment
+	export LANG=en_US.UTF-8
+	export LC_ALL=en_US.UTF-8
+	export CUDA_HOME=/usr/local/cuda
+	export PATH=${CUDA_HOME}/bin:${PATH}
+	export LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+	export CC=gcc
+	export CXX=g++
+
+%runscript
+	echo "OpenMP Target Offload environment for NVIDIA GPUs"
+	echo "Use with: singularity shell --nv openmp-target-nvidia.sif"
+	exec "$@"

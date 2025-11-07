@@ -1,0 +1,62 @@
+Bootstrap: docker
+From: rocm/dev-ubuntu-22.04:6.1.2-complete
+
+%labels
+	Maintainer "Fletcher Base Project"
+	AOMPVersion "ROCm 6.1.2"
+	Description "OpenMP target offload with AOMP for AMD GPUs"
+
+%help
+	This container provides ROCm Clang with OpenMP target offload support for AMD GPUs.
+	Use `singularity shell --rocm openmp-target-amd.sif` to enter the environment.
+
+	Common AMD GPU architectures:
+	- RX 7900 XTX: gfx1100 (RDNA 3)
+	- MI210: gfx90a (CDNA 2)
+	- MI300X: gfx942 (CDNA 3)
+
+	Build Fletcher:
+	  singularity shell --rocm openmp-target-amd.sif
+	  cd fletcher-base/original
+	  # Edit OpenMP_Target/flags.mk to set CC=/opt/rocm/llvm/bin/clang
+	  # and adjust -march=gfx1100 to your GPU
+	  make backend=OpenMP_Target
+
+%post
+	set -ex
+
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		build-essential \
+		ca-certificates \
+		cmake \
+		make \
+		locales
+
+	# Generate and set locale
+	locale-gen en_US.UTF-8
+	update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+	rm -rf /var/lib/apt/lists/*
+
+	# Provide environment setup
+	cat <<'EOF' >/etc/profile.d/openmp-target.sh
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+export ROCM_PATH=/opt/rocm
+export PATH=${ROCM_PATH}/bin:${ROCM_PATH}/llvm/bin:${PATH}
+export LD_LIBRARY_PATH=${ROCM_PATH}/lib:${ROCM_PATH}/lib64:${ROCM_PATH}/llvm/lib:${LD_LIBRARY_PATH}
+EOF
+
+%environment
+	export LANG=en_US.UTF-8
+	export LC_ALL=en_US.UTF-8
+	export ROCM_PATH=/opt/rocm
+	export PATH=${ROCM_PATH}/bin:${ROCM_PATH}/llvm/bin:${PATH}
+	export LD_LIBRARY_PATH=${ROCM_PATH}/lib:${ROCM_PATH}/lib64:${ROCM_PATH}/llvm/lib:${LD_LIBRARY_PATH}
+
+%runscript
+	echo "OpenMP Target Offload environment for AMD GPUs"
+	echo "Use with: singularity shell --rocm openmp-target-amd.sif"
+	exec "$@"
