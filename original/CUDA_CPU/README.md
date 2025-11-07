@@ -1,54 +1,49 @@
-# CPU+GPU Hybrid RTM Implementation
+# Optimized CUDA RTM Implementation
 
 ## Overview
 
-This is an optimized CPU+GPU hybrid implementation of the Fletcher RTM (Reverse Time Migration) algorithm. It implements three key optimizations over the standard CUDA-only implementation:
+This is an optimized CUDA implementation of the Fletcher RTM (Reverse Time Migration) algorithm with two key improvements over the standard CUDA implementation:
 
-### 1. **Optimized InsertSource Kernel**
+### 1. **Optimized InsertSource Kernel** ✅
 - **Before**: Launched 32 threads but only used 1
 - **After**: Launches 1 thread in 1 block
-- **Benefit**: Eliminates wasted thread resources and reduces kernel launch overhead
+- **Benefit**: Eliminates wasted thread resources (~32x reduction in unused threads)
 
-### 2. **CUDA Streams for Asynchronous Execution**
+### 2. **CUDA Streams for Asynchronous Execution** ✅
 - **Implementation**: Created two CUDA streams (`compute_stream` and `transfer_stream`)
-- **Current Use**: Source insertion and propagation use `compute_stream`
+- **Current Use**: All kernels use `compute_stream` for async execution
 - **Future Potential**: Can enable overlap between compute and I/O operations
 - **Benefit**: Foundation for asynchronous I/O and multi-stream parallelism
 
-### 3. **CPU Boundary Layer Processing with OpenMP**
-- **Key Innovation**: CPU and GPU work in parallel on different Z-layers
-- **GPU**: Processes interior Z-layers (bulk of computation)
-- **CPU**: Processes top and bottom boundary Z-layers (configurable, default: 2 layers each)
-- **Parallelization**: CPU code uses OpenMP for multi-threaded execution
-- **Benefit**: Keeps both CPU and GPU busy, eliminates CPU idle time
+### 3. **CPU Boundary Layer Processing** ⚠️ DISABLED BY DEFAULT
+- **Status**: Implemented but disabled (set to 0 layers)
+- **Reason**: Requires expensive GPU↔CPU data transfers that negate all benefits
+- **Performance Impact**: Enabling CPU processing caused **6.7x slowdown** in testing
+- **Future Work**: Would require pinned memory and async transfers to be viable
+- **Current Mode**: GPU processes entire domain (recommended)
 
 ## Architecture
 
+### Current Mode (GPU-Only, Recommended)
+
 ```
 Time Loop:
-┌─────────────────────────────────────────────────────┐
-│  Insert Source (GPU, async on compute_stream)      │
-└─────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────┐
-│  GPU: Propagate Interior Z-layers                  │
-│  [bord+1+CPU_LAYERS, sz-bord-1-CPU_LAYERS)         │
-│  (Async on compute_stream)                          │
-│                                                      │
-│  ┌───────────────────────────────────────┐         │
-│  │                                        │         │
-│  │   Parallel Execution                   │         │
-│  │                                        │         │
-│  └───────────────────────────────────────┘         │
-│                                                      │
-│  CPU: Propagate Boundary Z-layers (OpenMP)         │
-│  Top: [bord+1, bord+1+CPU_LAYERS)                  │
-│  Bottom: [sz-bord-1-CPU_LAYERS, sz-bord-1)         │
-└─────────────────────────────────────────────────────┘
-                        │
-                        ▼
-          Synchronize compute_stream
+┌──────────────────────────────────────────────┐
+│  Insert Source (GPU, 1 thread)              │
+│  Async on compute_stream                     │
+└──────────────────────────────────────────────┘
+                    │
+                    ▼
+┌──────────────────────────────────────────────┐
+│  GPU Propagate: All Z-layers                │
+│  [bord+1, sz-bord-1)                         │
+│  Async on compute_stream                     │
+│                                              │
+│  Optimizations:                              │
+│  - 1-thread source insertion                 │
+│  - Stream-based async execution              │
+│  - No unnecessary synchronization            │
+└──────────────────────────────────────────────┘
 ```
 
 ## Implementation Details
@@ -67,22 +62,22 @@ Time Loop:
 
 ### Configuration
 
-The number of Z-layers processed on CPU is controlled by:
+**Default Mode**: GPU-only (CPU_BOUNDARY_LAYERS = 0)
+
+To enable CPU boundary processing (not recommended):
 ```c
 #define CPU_BOUNDARY_LAYERS 2  // in cpu_boundary.c
 ```
 
-Adjust this value based on:
-- CPU core count (more cores → can handle more layers)
-- GPU compute capability (faster GPU → use fewer CPU layers)
-- Problem size (larger domains → proportionally fewer layers on CPU)
+⚠️ **WARNING**: CPU boundary mode requires implementing GPU↔CPU data transfers with pinned memory and async operations. Current implementation causes significant slowdown.
 
-### Typical Speedup
+### Expected Performance
 
-Expected performance improvement: **15-40%**
-- 10-20% from eliminating CPU idle time
-- 5-10% from optimized source insertion
-- 0-10% from stream infrastructure (enables future I/O overlap)
+**Compared to original CUDA**:
+- Similar or slightly better performance expected
+- Optimized kernel launch overhead
+- Stream infrastructure for future improvements
+- No performance regression from unnecessary operations
 
 ## Building
 
@@ -133,34 +128,39 @@ Compare execution time with original CUDA version (backend=CUDA).
 
 ## Comparison with Original CUDA
 
-| Feature | Original CUDA | CUDA_CPU Hybrid |
-|---------|---------------|-----------------|
-| InsertSource threads | 32 (uses 1) | 1 (optimized) |
-| CUDA streams | No | Yes (2 streams) |
-| CPU utilization | ~5% | ~50-80% |
-| CPU idle time | ~95% | ~0% |
-| Boundary processing | GPU only | CPU+GPU parallel |
-| OpenMP | No | Yes |
+| Feature | Original CUDA | CUDA_CPU Optimized |
+|---------|---------------|-------------------|
+| InsertSource threads | 32 (uses 1) | 1 (optimized) ✅ |
+| CUDA streams | No | Yes (2 streams) ✅ |
+| GPU processing | All Z-layers | All Z-layers |
+| CPU boundary | No | Available but disabled |
+| Performance | Baseline | Similar/slightly better |
+| Code complexity | Simple | Slightly more complex |
+| Future I/O overlap | No | Ready for async I/O |
 
 ## Future Enhancements
 
-1. **Async I/O Pipeline**
-   - Use `transfer_stream` for async D2H transfers
+1. **Async I/O Pipeline** (High Priority)
+   - Use `transfer_stream` for async D2H transfers with pinned memory
    - Implement triple buffering for checkpoints
+   - Overlap I/O with next timestep computation
    - Expected additional speedup: 10-30%
 
-2. **Compression During Compute**
-   - CPU compresses data while GPU computes
-   - Use ZFP or LZ4 on boundary data
-   - Reduces I/O time by 50-80%
+2. **CPU Boundary Processing** (Requires Async Transfers)
+   - Implement pinned memory allocation for wave fields
+   - Add async cudaMemcpyAsync for boundary regions only
+   - CPU processes boundaries while GPU does interior
+   - Only viable with proper async data transfer implementation
 
-3. **Dynamic Load Balancing**
-   - Adjust CPU_BOUNDARY_LAYERS dynamically
-   - Based on GPU/CPU timing measurements
-
-4. **Multi-GPU Support**
+3. **Multi-GPU Support**
    - Domain decomposition across multiple GPUs
-   - CPU coordinates halo exchanges
+   - Use streams for overlapped halo exchange
+   - Each GPU uses optimized kernels
+
+4. **Compression During Compute**
+   - CPU compresses data during GPU compute (using existing streams)
+   - Use ZFP or LZ4 for checkpoint compression
+   - Reduces I/O time by 50-80%
 
 ## Troubleshooting
 

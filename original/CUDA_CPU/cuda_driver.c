@@ -57,7 +57,7 @@ void DRIVER_Initialize(const int sx, const int sy, const int sz, const int bord,
   	          phi,    theta,
   	          pp,    pc,    qp,    qc);
 
-	   // Store host pointers for CPU boundary processing
+	   // Store host pointers for CPU boundary processing (if enabled)
 	   host_ch1dxx = ch1dxx;
 	   host_ch1dyy = ch1dyy;
 	   host_ch1dzz = ch1dzz;
@@ -69,7 +69,13 @@ void DRIVER_Initialize(const int sx, const int sy, const int sz, const int bord,
 	   host_v2sz = v2sz;
 	   host_v2pn = v2pn;
 
-	   printf("CPU+GPU Hybrid Mode: CPU will process %d boundary Z-layers\n", CPU_GetBoundaryLayers());
+	   const int cpu_layers = CPU_GetBoundaryLayers();
+	   if (cpu_layers > 0) {
+	       printf("CPU+GPU Hybrid Mode: CPU will process %d boundary Z-layers\n", cpu_layers);
+	       printf("WARNING: CPU boundary mode requires data transfers (not yet implemented)\n");
+	   } else {
+	       printf("GPU-Only Mode with optimizations: 1-thread source, CUDA streams\n");
+	   }
 
 }
 
@@ -94,35 +100,41 @@ void DRIVER_Propagate(const int sx, const int sy, const int sz, const int bord,
 	              float * pp, float * pc, float * qp, float * qc)
 {
 
-	// CPU+GPU Hybrid approach:
-	// 1. CPU processes boundary Z-layers
-	// 2. GPU processes interior Z-layers in parallel
-	// 3. Synchronize when done
+	// GPU processes entire domain using optimized kernel with streams
+	// CPU boundary processing disabled by default (requires expensive D2H/H2D transfers)
 
 	const int cpu_layers = CPU_GetBoundaryLayers();
 
-	// Calculate Z-range for GPU (interior region)
-	const int gpu_z_start = bord + 1 + cpu_layers;
-	const int gpu_z_end = sz - bord - 1 - cpu_layers;
+	if (cpu_layers > 0) {
+		// CPU+GPU Hybrid mode (WARNING: requires data transfer implementation)
+		// Not recommended - data transfer overhead negates benefits
 
-	// Launch GPU kernel asynchronously on compute_stream
-	// GPU handles interior Z-layers: [gpu_z_start, gpu_z_end)
-	CUDA_Propagate(sx, sy, sz, bord,
-	               dx, dy, dz, dt, it,
-	               pp, pc, qp, qc,
-	               compute_stream, gpu_z_start, gpu_z_end);
+		const int gpu_z_start = bord + 1 + cpu_layers;
+		const int gpu_z_end = sz - bord - 1 - cpu_layers;
 
-	// While GPU is working, CPU processes boundary Z-layers
-	// CPU handles: [bord+1, bord+1+cpu_layers) and [sz-bord-1-cpu_layers, sz-bord-1)
-	CPU_ProcessBoundaries(sx, sy, sz, bord,
-	                      dx, dy, dz, dt,
-	                      host_ch1dxx, host_ch1dyy, host_ch1dzz,
-	                      host_ch1dxy, host_ch1dyz, host_ch1dxz,
-	                      host_v2px, host_v2pz, host_v2sz, host_v2pn,
-	                      pp, pc, qp, qc);
+		CUDA_Propagate(sx, sy, sz, bord,
+		               dx, dy, dz, dt, it,
+		               pp, pc, qp, qc,
+		               compute_stream, gpu_z_start, gpu_z_end);
 
-	// Synchronize stream to ensure GPU is done before continuing
-	cudaStreamSynchronize(compute_stream);
+		CPU_ProcessBoundaries(sx, sy, sz, bord,
+		                      dx, dy, dz, dt,
+		                      host_ch1dxx, host_ch1dyy, host_ch1dzz,
+		                      host_ch1dxy, host_ch1dyz, host_ch1dxz,
+		                      host_v2px, host_v2pz, host_v2sz, host_v2pn,
+		                      pp, pc, qp, qc);
+
+		cudaStreamSynchronize(compute_stream);
+	} else {
+		// GPU-only mode with optimized kernel (RECOMMENDED)
+		// Benefits: optimized 1-thread source insertion, CUDA streams
+		CUDA_Propagate(sx, sy, sz, bord,
+		               dx, dy, dz, dt, it,
+		               pp, pc, qp, qc,
+		               compute_stream, bord + 1, sz - bord - 1);
+
+		// No explicit sync needed - handled by main loop
+	}
 
 }
 

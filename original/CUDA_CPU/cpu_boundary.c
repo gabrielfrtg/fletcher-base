@@ -7,7 +7,9 @@
 #include "../map.h"
 
 // Number of Z-layers to process on CPU (configurable)
-#define CPU_BOUNDARY_LAYERS 2
+// NOTE: Set to 0 to disable CPU boundary processing (GPU does all work)
+// CPU boundary processing requires expensive GPU<->CPU transfers that negate benefits
+#define CPU_BOUNDARY_LAYERS 0
 
 // CPU function to process boundary Z-layers
 // This processes the top and bottom Z-layers while GPU handles the interior
