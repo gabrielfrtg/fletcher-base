@@ -43,9 +43,9 @@ void RandomVelocityBoundary(int sx, int sy, int sz,
 	  continue;
 	}
 	// random speed inside absortion zone
-	else if ((iz>=bord && iz<=2*bordLen+nz) &&
-		 (iy>=bord && iy<=2*bordLen+ny) &&
-		 (ix>=bord && ix<=2*bordLen+nx)) {
+	else if ((iz >= bord && iz <= bord + absorb + nz + absorb - 1) &&
+        (iy >= bord && iy <= bord + absorb + ny + absorb - 1) &&
+        (ix >= bord && ix <= bord + absorb + nx + absorb - 1)) {
 	  if (iz>bordLen+nz) {
 	    distz=iz-bordLen-nz;
 	    ivelz=bordLen+nz;
